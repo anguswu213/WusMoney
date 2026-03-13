@@ -416,17 +416,31 @@ function setSyncURL(url){
 
 async function apiCall(params){
   if(!syncURL) throw new Error('NO_URL');
-  const isGet = params.action.startsWith('get');
-  const url = isGet ? syncURL + '?action=' + params.action : syncURL;
-  const opts = isGet ? { method:'GET' } : {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(params)
-  };
-  const res = await fetch(url, opts);
-  const json = await res.json();
+  const isReadOnly = (params.action==='getTx'||params.action==='getGoals');
+  let url = syncURL + '?action=' + encodeURIComponent(params.action);
+  if(!isReadOnly){
+    url += '&payload=' + encodeURIComponent(JSON.stringify(params));
+  }
+  syncLog('→ ' + params.action + ' ' + url.substring(0,80)+'…');
+  let res;
+  try { res = await fetch(url); }
+  catch(e){ throw new Error('網絡錯誤：' + e.message); }
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  let json;
+  try { json = await res.json(); }
+  catch(e){ throw new Error('返回格式錯誤（唔係JSON）'); }
   if(!json.ok) throw new Error(json.error || 'API error');
+  syncLog('✓ ' + params.action + ' OK');
   return json.data;
+}
+
+function syncLog(msg){
+  const el = document.getElementById('sync-debug-log');
+  if(!el) return;
+  const line = document.createElement('div');
+  line.textContent = new Date().toTimeString().slice(0,8) + ' ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
 }
 
 // Pull all data from Sheets → overwrite local cache
@@ -454,7 +468,7 @@ async function pushAddTx(tx){
   if(!syncURL) return;
   showSyncDot();
   try { await apiCall({action:'addTx', tx}); }
-  catch(e){ toast('雲端同步失敗，記錄已本地儲存'); }
+  catch(e){ toast('同步失敗：'+e.message); console.error('pushAddTx',e); }
   finally { hideSyncDot(); }
 }
 
@@ -462,7 +476,7 @@ async function pushUpdateTx(tx){
   if(!syncURL) return;
   showSyncDot();
   try { await apiCall({action:'updateTx', tx}); }
-  catch(e){ toast('雲端更新失敗'); }
+  catch(e){ toast('更新失敗：'+e.message); console.error('pushUpdateTx',e); }
   finally { hideSyncDot(); }
 }
 
@@ -470,7 +484,7 @@ async function pushDeleteTx(id){
   if(!syncURL) return;
   showSyncDot();
   try { await apiCall({action:'deleteTx', id}); }
-  catch(e){ toast('雲端刪除失敗'); }
+  catch(e){ toast('刪除失敗：'+e.message); console.error('pushDeleteTx',e); }
   finally { hideSyncDot(); }
 }
 
@@ -1007,8 +1021,8 @@ function renderSettings(){
           ${connected?`<button onclick="doMigrate()" style="flex:1;padding:10px;background:var(--bg3);color:var(--text);border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">上傳本地記錄</button>`:''}
         </div>
         ${connected?`<button onclick="doPull()" style="width:100%;margin-top:8px;padding:10px;background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">↓ 從雲端重新載入</button>`:''}
-      </div>
-    </div>
+        ${connected?`<button onclick="testConnection()" style="width:100%;margin-top:8px;padding:10px;background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">🔍 測試連接</button>`:''}
+        <div id="sync-debug-log" style="margin-top:10px;background:var(--bg3);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;color:var(--text2);max-height:120px;overflow-y:auto;display:${connected?'block':'none'}"></div>
 
     <div class="gs">
       <div class="gst">資料</div>
@@ -1048,6 +1062,20 @@ async function doPull(){
 async function doMigrate(){
   if(!confirm('呢個操作會將本地所有記錄上傳到 Google Sheets 並覆蓋雲端現有資料，確定繼續？')) return;
   await migrateToSheets();
+}
+
+async function testConnection(){
+  const el = document.getElementById('sync-debug-log');
+  if(el){ el.innerHTML=''; el.style.display='block'; }
+  syncLog('測試連接中…');
+  try {
+    const txs = await apiCall({action:'getTx'});
+    syncLog('✅ 連接成功！Sheets 有 ' + txs.length + ' 筆記錄');
+    toast('連接正常 ✓ Sheets 有 ' + txs.length + ' 筆記錄');
+  } catch(e) {
+    syncLog('❌ 失敗：' + e.message);
+    toast('連接失敗：' + e.message);
+  }
 }
 
 function expCSV(){
