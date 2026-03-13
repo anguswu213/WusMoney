@@ -138,7 +138,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
 /* MODAL */
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;}
 .mo.open{display:flex;}
-.msh{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-height:92vh;overflow-y:auto;animation:su .3s cubic-bezier(.32,.72,0,1);padding-bottom:env(safe-area-inset-bottom);}
+.msh{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-height:92vh;overflow-y:auto;overflow-x:hidden;animation:su .3s cubic-bezier(.32,.72,0,1);padding-bottom:env(safe-area-inset-bottom);touch-action:pan-y;}
 .msh::-webkit-scrollbar{display:none;}
 @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .mh2{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;}
@@ -154,10 +154,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
 .ttb.active.income{background:var(--income);color:white;}
 
 /* AMOUNT */
-.ad{text-align:center;padding:4px 20px 16px;}
-.av{font-family:var(--mono);font-size:42px;font-weight:700;letter-spacing:-1px;color:var(--text3);}
+.ad{text-align:center;padding:8px 20px 12px;background:var(--card);position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border);margin-bottom:4px;}
+.av{font-family:var(--mono);font-size:44px;font-weight:700;letter-spacing:-1px;color:var(--text3);}
 .av.hv.expense{color:var(--expense);}.av.hv.income{color:var(--income);}
-.ac{font-size:20px;color:var(--text3);margin-right:4px;}
+.ac{font-size:22px;color:var(--text3);margin-right:4px;}
 
 /* FORM */
 .ff{padding:0 20px;}
@@ -321,7 +321,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
 
     <!-- EXPENSE FORM -->
     <div id="expense-form" class="ff">
-      <div class="ffi"><div class="ffl">描述</div><input class="fi" id="tx-name" placeholder="店名或描述" type="text"></div>
       <div class="ffi">
         <div class="ffl">類別</div>
         <div class="nt">
@@ -330,15 +329,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
         </div>
         <div class="sg" id="subcat-grid"></div>
       </div>
-      <div class="ffi"><div class="ffl">備註</div><input class="fi" id="tx-note" placeholder="選填" type="text"></div>
+      <div class="ffi"><div class="ffl">描述</div><input class="fi" id="tx-name" placeholder="店名或描述" type="text"></div>
       <div class="ffi"><div class="ffl">日期</div><input class="fi" id="tx-date" type="date"></div>
     </div>
 
     <!-- INCOME FORM -->
     <div id="income-form" class="ff" style="display:none">
-      <div class="ffi"><div class="ffl">描述</div><input class="fi" id="inc-name" placeholder="例：四月薪金" type="text"></div>
       <div class="ffi"><div class="ffl">類別</div><div class="sg" id="income-cat-grid"></div></div>
-      <div class="ffi"><div class="ffl">備註</div><input class="fi" id="inc-note" placeholder="選填" type="text"></div>
+      <div class="ffi"><div class="ffl">描述</div><input class="fi" id="inc-name" placeholder="例：四月薪金" type="text"></div>
       <div class="ffi"><div class="ffl">日期</div><input class="fi" id="inc-date" type="date"></div>
     </div>
 
@@ -535,6 +533,10 @@ function saveLocal(){try{localStorage.setItem('bv4',JSON.stringify(data));}catch
 // Goals separate key
 function goalsLoad(){try{const d=localStorage.getItem('goals_v1');return d?JSON.parse(d):[];}catch{return[];}}
 function goalsSave(g){try{localStorage.setItem('goals_v1',JSON.stringify(g));pushGoals();}catch{}}
+// Recurring expenses
+function recurLoad(){try{const d=localStorage.getItem('recur_v1');return d?JSON.parse(d):[];}catch{return[];}}
+function recurSave(r){try{localStorage.setItem('recur_v1',JSON.stringify(r));}catch{}}
+let recurs=recurLoad();
 let data=loadLocal();
 
 if(!data.transactions.length){
@@ -776,11 +778,13 @@ function closeCDP(){
 function renderCDP(catId){
   const cat = getSub(catId);
   const {y, m} = cdpViewMonth;
-  // 6 months window centred around cdpViewMonth
+  const today = new Date();
+  const realY = today.getFullYear(), realM = today.getMonth()+1;
+  // 6 months window: show 5 months before selected + selected month
   const m6 = [];
   for(let i=5;i>=0;i--){const d=new Date(y,m-1-i,1);m6.push({y:d.getFullYear(),m:d.getMonth()+1,lb:(d.getMonth()+1)+'月'});}
   const tv = m6.map(({y:y2,m:m2})=>data.transactions.filter(t=>{const[ty,tm]=t.date.split('-').map(Number);return ty===y2&&tm===m2&&t.category===catId;}).reduce((s,t)=>s+t.amount,0));
-  const tot = tv[5]; // current selected month is always last bar
+  const tot = tv[5];
 
   // Transactions for selected month
   const mTx = data.transactions.filter(t=>{const[ty,tm]=t.date.split('-').map(Number);return ty===y&&tm===m&&t.category===catId;}).sort((a,b)=>b.date.localeCompare(a.date));
@@ -792,9 +796,11 @@ function renderCDP(catId){
 
   document.getElementById('cdp-content').innerHTML =
     '<div class="cdp-nav"><button class="mb" onclick="cdpChangeMonth(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg></button><span class="cdp-nav-label">'+y+'年'+m+'月</span><button class="mb" onclick="cdpChangeMonth(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></button></div>'+
-    '<div class="ss"><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="sst" style="margin-bottom:0">本月支出</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:'+cat.color+'">$'+fmt(tot)+'</div></div></div>'+
+    '<div class="ss"><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="sst" style="margin-bottom:0">'+y+'年'+m+'月支出</div><div style="font-family:var(--mono);font-size:20px;font-weight:700;color:'+cat.color+'">$'+fmt(tot)+'</div></div></div>'+
     '<div style="height:1px;background:var(--border);margin:0 20px"></div>'+
-    '<div class="ss" style="padding-bottom:8px"><div class="sst">近6個月比較</div><div class="cw"><canvas id="cdp-chart"></canvas></div></div>'+
+    '<div class="ss" style="padding-bottom:8px"><div class="sst">近6個月比較</div><div class="cw"><canvas id="cdp-chart"></canvas></div>'+
+    '<div style="display:flex;gap:12px;margin-top:6px"><div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:2px;background:'+cat.color+'"></div><span style="font-size:11px;color:var(--text3)">選擇月份</span></div><div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:2px;background:'+cat.color+'66;border:1.5px solid '+cat.color+'"></div><span style="font-size:11px;color:var(--text3)">當前月份</span></div></div>'+
+    '</div>'+
     '<div style="height:1px;background:var(--border);margin:0 20px"></div>'+
     '<div class="ss" style="padding-bottom:4px"><div class="sst">'+y+'年'+m+'月記錄</div></div>'+
     txHtml + '<div style="height:24px"></div>';
@@ -802,7 +808,19 @@ function renderCDP(catId){
   setTimeout(()=>{
     try{if(charts.cdpC)charts.cdpC.destroy();}catch{}
     const c = document.getElementById('cdp-chart'); if(!c)return;
-    charts.cdpC = new Chart(c,{type:'bar',data:{labels:m6.map(x=>x.lb),datasets:[{data:tv,backgroundColor:m6.map((_,i)=>i===5?cat.color:cat.color+'55'),borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' $'+fmt(ctx.raw)}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4,font:{family:'DM Mono'}}},x:{grid:{display:false}}},animation:{duration:400}}});
+    // selected month = last bar (i===5), current real month may be elsewhere
+    const bgColors = m6.map(({y:y2,m:m2},i)=>{
+      const isSelected = i===5; // selected is always last
+      const isReal = y2===realY && m2===realM;
+      if(isSelected) return cat.color;
+      if(isReal) return cat.color+'66';
+      return cat.color+'33';
+    });
+    const borderColors = m6.map(({y:y2,m:m2},i)=>{
+      const isReal = y2===realY && m2===realM && i!==5;
+      return isReal ? cat.color : 'transparent';
+    });
+    charts.cdpC = new Chart(c,{type:'bar',data:{labels:m6.map(x=>x.lb),datasets:[{data:tv,backgroundColor:bgColors,borderColor:borderColors,borderWidth:2,borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' $'+fmt(ctx.raw)}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4,font:{family:'DM Mono'}}},x:{grid:{display:false}}},animation:{duration:400}}});
   },50);
 }
 
@@ -860,11 +878,16 @@ function renderNecDP(necType){
   setTimeout(()=>{
     try{if(charts.cdpC)charts.cdpC.destroy();}catch{}
     const c = document.getElementById('cdp-chart'); if(!c)return;
-    charts.cdpC = new Chart(c,{type:'bar',data:{labels:m6.map(x=>x.lb),datasets:[{data:tv,backgroundColor:m6.map((_,i)=>i===5?color:color+'55'),borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' $'+fmt(ctx.raw)}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4,font:{family:'DM Mono'}}},x:{grid:{display:false}}},animation:{duration:400}}});
+    const today2 = new Date(); const realY2=today2.getFullYear(),realM2=today2.getMonth()+1;
+    const bgColors2 = m6.map(({y:y2,m:m2},i)=>{
+      if(i===5) return color;
+      if(y2===realY2&&m2===realM2) return color+'66';
+      return color+'33';
+    });
+    const borderColors2 = m6.map(({y:y2,m:m2},i)=>y2===realY2&&m2===realM2&&i!==5?color:'transparent');
+    charts.cdpC = new Chart(c,{type:'bar',data:{labels:m6.map(x=>x.lb),datasets:[{data:tv,backgroundColor:bgColors2,borderColor:borderColors2,borderWidth:2,borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' $'+fmt(ctx.raw)}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4,font:{family:'DM Mono'}}},x:{grid:{display:false}}},animation:{duration:400}}});
   },50);
 }
-
-// ===== GOALS =====
 let goals = goalsLoad();
 
 function renderGoals(){
@@ -901,6 +924,7 @@ function renderGoals(){
           <div style="font-size:11px;color:var(--text3);margin-top:2px">${gy}年${gm}月目標 · ${timeStr}</div>
         </div>
         <div style="display:flex;gap:8px">
+          <button onclick="openGoalEditModal(${gi})" style="padding:6px 10px;background:var(--bg2);border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;font-family:var(--font);color:var(--text2);cursor:pointer;">編輯</button>
           <button onclick="openGoalUpdateModal(${gi})" style="padding:6px 12px;background:var(--bg2);border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;font-family:var(--font);color:var(--text2);cursor:pointer;">更新</button>
           <button onclick="deleteGoal(${gi})" style="padding:6px 10px;background:#FEE2E2;border:none;border-radius:var(--radius-sm);font-size:12px;color:var(--expense);cursor:pointer;font-family:var(--font);">刪除</button>
         </div>
@@ -957,6 +981,39 @@ function submitGoal(btn){
   renderGoals();
 }
 
+function openGoalEditModal(gi){
+  const g = goals[gi];
+  const ov = document.createElement('div'); ov.className='mo open'; ov.style.zIndex='400';
+  ov.innerHTML = `<div class="msh" onclick="event.stopPropagation()">
+    <div class="mh2"></div>
+    <div class="mhdr"><span class="mti">編輯目標</span><button class="mcl" onclick="this.closest('.mo').remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="ff" style="padding-bottom:8px">
+      <div class="ffi"><div class="ffl">目標名稱</div><input class="fi" id="ge-name" type="text" value="${g.name}"></div>
+      <div class="ffi"><div class="ffl">目標金額 ($)</div><input class="fi" id="ge-target" type="number" inputmode="decimal" value="${g.target}"></div>
+      <div class="ffi"><div class="ffl">目標達成月份</div><input class="fi" id="ge-deadline" type="month" value="${g.deadline}"></div>
+    </div>
+    <button class="sbtn" onclick="submitGoalEdit(${gi},this)">儲存更改</button>
+  </div>`;
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+}
+
+function submitGoalEdit(gi, btn){
+  const name = document.getElementById('ge-name').value.trim();
+  const target = parseFloat(document.getElementById('ge-target').value);
+  const deadline = document.getElementById('ge-deadline').value;
+  if(!name){toast('請輸入目標名稱');return;}
+  if(!target||target<=0){toast('請輸入有效金額');return;}
+  if(!deadline){toast('請選擇目標月份');return;}
+  goals[gi].name = name;
+  goals[gi].target = target;
+  goals[gi].deadline = deadline;
+  goalsSave(goals);
+  btn.closest('.mo').remove();
+  toast('目標已更新 ✓');
+  renderGoals();
+}
+
 function openGoalUpdateModal(gi){
   const g = goals[gi];
   const now = new Date();
@@ -1001,7 +1058,149 @@ function deleteGoal(gi){
   renderGoals();
 }
 
-// ===== SETTINGS =====
+// ===== RECURRING EXPENSES =====
+// freq: 'monthly' | 'biweekly'
+// startDate: YYYY-MM-DD (anchor date)
+// lastGenerated: YYYY-MM (last month we generated for)
+
+function recurGenerate(){
+  // Generate any missing transactions from recurring rules up to today
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  let added = 0;
+  recurs.forEach(r=>{
+    if(!r.active) return;
+    const dates = recurDates(r, today);
+    dates.forEach(dateStr=>{
+      // Check if transaction for this exact recur+date already exists
+      const exists = data.transactions.some(t=>t.recurId===r.id && t.date===dateStr);
+      if(!exists){
+        const tx = {id: Date.now()+Math.random(), type:'expense', amount:r.amount,
+          name:r.name, category:r.category, date:dateStr, note:'🔁 定期', recurId:r.id};
+        data.transactions.push(tx);
+        pushAddTx(tx);
+        added++;
+      }
+    });
+  });
+  if(added){ saveLocal(); }
+  return added;
+}
+
+function recurDates(r, upTo){
+  // Return all dates this rule should have fired from startDate up to upTo
+  const results = [];
+  const start = new Date(r.startDate+'T00:00:00');
+  if(start > upTo) return results;
+  if(r.freq === 'monthly'){
+    // Same day every month from start month to current month
+    let d = new Date(start);
+    while(d <= upTo){
+      results.push(d.toISOString().split('T')[0]);
+      d = new Date(d.getFullYear(), d.getMonth()+1, start.getDate());
+    }
+  } else if(r.freq === 'biweekly'){
+    let d = new Date(start);
+    while(d <= upTo){
+      results.push(d.toISOString().split('T')[0]);
+      d = new Date(d.getTime() + 14*86400000);
+    }
+  }
+  return results;
+}
+
+function renderRecurSection(){
+  const items = recurs.map((r,i)=>{
+    const cat = getSub(r.category);
+    const freqLabel = r.freq==='monthly'?'每月':'每兩週';
+    const statusColor = r.active?'var(--income)':'var(--text3)';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);">
+      <div style="font-size:22px">${cat.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${freqLabel} · 由 ${r.startDate} 起 · <span style="font-family:var(--mono)">$${fmt(r.amount)}</span></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button onclick="toggleRecur(${i})" style="padding:5px 8px;background:${r.active?'#FEF3C7':'var(--bg2)'};border:none;border-radius:6px;font-size:11px;font-weight:600;color:${r.active?'#92400E':'var(--text3)'};cursor:pointer;font-family:var(--font)">${r.active?'暫停':'啟用'}</button>
+        <button onclick="deleteRecur(${i})" style="padding:5px 8px;background:#FEE2E2;border:none;border-radius:6px;font-size:11px;color:var(--expense);cursor:pointer;font-family:var(--font)">刪除</button>
+      </div>
+    </div>`;
+  }).join('') || '<div style="padding:14px 16px;font-size:13px;color:var(--text3)">暫無定期支出</div>';
+  return items;
+}
+
+function openRecurModal(){
+  const today = new Date().toISOString().split('T')[0];
+  const ov = document.createElement('div'); ov.className='mo open'; ov.style.zIndex='400';
+  const allCats = [...EXP.necessary.subs, ...EXP.unnecessary.subs];
+  const catOpts = allCats.map(c=>`<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+  ov.innerHTML = `<div class="msh" onclick="event.stopPropagation()">
+    <div class="mh2"></div>
+    <div class="mhdr"><span class="mti">新增定期支出</span><button class="mcl" onclick="this.closest('.mo').remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+    <div class="ff" style="padding-bottom:8px">
+      <div class="ffi"><div class="ffl">描述</div><input class="fi" id="rc-name" placeholder="例：Strata 管理費" type="text"></div>
+      <div class="ffi"><div class="ffl">金額 ($)</div><input class="fi" id="rc-amount" placeholder="例：450" type="number" inputmode="decimal"></div>
+      <div class="ffi"><div class="ffl">類別</div><select class="fi" id="rc-cat">${catOpts}</select></div>
+      <div class="ffi"><div class="ffl">重複頻率</div>
+        <div style="display:flex;gap:8px">
+          <button id="rc-monthly" onclick="setRecurFreq('monthly')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--accent);background:var(--accent);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">每月</button>
+          <button id="rc-biweekly" onclick="setRecurFreq('biweekly')" style="flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)">每兩週</button>
+        </div>
+      </div>
+      <div class="ffi"><div class="ffl">開始日期（第一次發生的日期）</div><input class="fi" id="rc-start" type="date" value="${today}"></div>
+    </div>
+    <button class="sbtn" onclick="submitRecur(this)">建立定期支出</button>
+  </div>`;
+  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+  ov._recurFreq = 'monthly';
+}
+
+function setRecurFreq(f){
+  const ov = document.querySelector('.mo[style*="400"]') || document.querySelector('.mo.open');
+  ov._recurFreq = f;
+  document.getElementById('rc-monthly').style.cssText = f==='monthly'
+    ? 'flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--accent);background:var(--accent);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)'
+    : 'flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)';
+  document.getElementById('rc-biweekly').style.cssText = f==='biweekly'
+    ? 'flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--accent);background:var(--accent);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)'
+    : 'flex:1;padding:10px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font)';
+}
+
+function submitRecur(btn){
+  const name = document.getElementById('rc-name').value.trim();
+  const amount = parseFloat(document.getElementById('rc-amount').value);
+  const category = document.getElementById('rc-cat').value;
+  const startDate = document.getElementById('rc-start').value;
+  const ov = btn.closest('.mo');
+  const freq = ov._recurFreq || 'monthly';
+  if(!name){toast('請輸入描述');return;}
+  if(!amount||amount<=0){toast('請輸入有效金額');return;}
+  if(!startDate){toast('請選擇開始日期');return;}
+  const r = {id: Date.now(), name, amount, category, freq, startDate, active:true};
+  recurs.push(r);
+  recurSave(recurs);
+  ov.remove();
+  const added = recurGenerate();
+  toast('定期支出已建立，自動生成 '+added+' 筆記錄 ✓');
+  renderSettings();
+  render(curPage);
+}
+
+function toggleRecur(i){
+  recurs[i].active = !recurs[i].active;
+  recurSave(recurs);
+  if(recurs[i].active){ const n=recurGenerate(); if(n)render(curPage); }
+  renderSettings();
+}
+
+function deleteRecur(i){
+  if(!confirm('刪除此定期支出？\n（之前已生成的記錄不受影響）')) return;
+  recurs.splice(i,1);
+  recurSave(recurs);
+  toast('已刪除定期支出');
+  renderSettings();
+}
 function renderSettings(){
   const url = getSyncURL();
   const connected = !!url;
@@ -1034,6 +1233,12 @@ function renderSettings(){
       <div class="gst">iOS Shortcuts</div>
       <div class="sr" onclick="shortcutGuide('manual')"><div class="sri" style="background:#FFF3E0">✍️</div><div class="srt"><div class="srl">手動輸入捷徑</div><div class="srs">快速記帳 Shortcut 設定</div></div><div class="sra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div></div>
       <div class="sr" onclick="shortcutGuide('wallet')"><div class="sri" style="background:#F3E5F5">💳</div><div class="srt"><div class="srl">Apple Wallet 自動觸發</div><div class="srs">交易通知自動彈出記帳</div></div><div class="sra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div></div>
+    </div>
+
+    <div class="gs">
+      <div class="gst">固定支出</div>
+      ${renderRecurSection()}
+      <div style="padding:12px 16px"><button onclick="openRecurModal()" style="width:100%;padding:11px;background:var(--bg2);color:var(--text2);border:1px dashed var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;">+ 新增定期支出</button></div>
     </div>
 
     <div class="gs">
@@ -1098,7 +1303,7 @@ function openAddModal(pre){
   document.getElementById('modal-title').textContent='新增記錄';
   document.getElementById('amount-display').textContent='0';
   document.getElementById('amount-display').className='av';
-  ['tx-name','tx-note','inc-name','inc-note'].forEach(id=>document.getElementById(id).value='');
+  ['tx-name','inc-name'].forEach(id=>document.getElementById(id).value='');
   const td=new Date().toISOString().split('T')[0];
   document.getElementById('tx-date').value=td;document.getElementById('inc-date').value=td;
   document.querySelectorAll('.ttb').forEach(b=>b.classList.remove('active'));
@@ -1153,7 +1358,7 @@ function submitTx(){
     name:isInc?(document.getElementById('inc-name').value||getInc(selInc).label):(document.getElementById('tx-name').value||getSub(selCat).label),
     category:isInc?selInc:selCat,
     date:isInc?document.getElementById('inc-date').value:document.getElementById('tx-date').value,
-    note:isInc?document.getElementById('inc-note').value:document.getElementById('tx-note').value,
+    note:'',
   };
   if(isEdit){const i=data.transactions.findIndex(t=>t.id===editId);if(i>=0)data.transactions[i]=tx;pushUpdateTx(tx);}
   else{data.transactions.push(tx);pushAddTx(tx);}
@@ -1183,8 +1388,8 @@ function editTx(){
   document.querySelector('.ttb.'+t.type)?.classList.add('active');
   document.getElementById('expense-form').style.display=t.type==='expense'?'':'none';
   document.getElementById('income-form').style.display=t.type==='income'?'':'none';
-  if(t.type==='expense'){selNec=necOf(t.category);selCat=t.category;updNecBtns();renderSubcats();document.getElementById('tx-name').value=t.name;document.getElementById('tx-date').value=t.date;document.getElementById('tx-note').value=t.note||'';}
-  else{selInc=t.category;renderIncCats();document.getElementById('inc-name').value=t.name;document.getElementById('inc-date').value=t.date;document.getElementById('inc-note').value=t.note||'';}
+  if(t.type==='expense'){selNec=necOf(t.category);selCat=t.category;updNecBtns();renderSubcats();document.getElementById('tx-name').value=t.name;document.getElementById('tx-date').value=t.date;}
+  else{selInc=t.category;renderIncCats();document.getElementById('inc-name').value=t.name;document.getElementById('inc-date').value=t.date;}
 }
 function deleteTx(){const id=detailId;data.transactions=data.transactions.filter(t=>t.id!==id);saveLocal();pushDeleteTx(id);closeDM();toast('已刪除記錄');render(curPage);}
 
@@ -1196,7 +1401,7 @@ function handleURL(){const p=new URLSearchParams(window.location.search);if(p.ha
 
 // ===== INIT =====
 updateLabels();
-pullFromSheets().then(()=>{ render(curPage); });
+pullFromSheets().then(()=>{ recurGenerate(); render(curPage); });
 renderTxPage();
 handleURL();
 </script>
