@@ -1369,7 +1369,7 @@ function submitTx(){
     date:isInc?document.getElementById('inc-date').value:document.getElementById('tx-date').value,
     note:'',
   };
-  if(isEdit){const i=data.transactions.findIndex(t=>t.id===editId);if(i>=0)data.transactions[i]=tx;pushUpdateTx(tx);}
+  if(isEdit){const i=data.transactions.findIndex(t=>String(t.id)===String(editId));if(i>=0)data.transactions[i]={...data.transactions[i],...tx};pushUpdateTx(tx);}
   else{data.transactions.push(tx);pushAddTx(tx);}
   saveLocal();closeAddModal();toast(isEdit?'已更新記錄 ✓':'已新增記錄 ✓');editId=null;render(curPage);
 }
@@ -1390,23 +1390,38 @@ function openDetail(id){
 function closeDM(){document.getElementById('detail-modal').classList.remove('open');}
 
 function directEdit(id){
-  // Tap on transaction → straight to edit modal, no intermediate detail sheet
-  detailId=id;
-  editTx();
-}
-
-function editTx(){
-  const t=data.transactions.find(t=>t.id===(detailId||editId));if(!t)return;
-  closeDM();editId=t.id;openAddModal();
-  document.getElementById('modal-title').textContent='編輯記錄';
-  amtStr=String(t.amount);updAmt();curType=t.type;
+  const t = data.transactions.find(t=>String(t.id)===String(id));
+  if(!t){ toast('找不到記錄'); return; }
+  // Pre-fill state before opening modal
+  editId = t.id;
+  curType = t.type;
+  amtStr = String(t.amount);
+  if(t.type==='expense'){ selNec=necOf(t.category); selCat=t.category; }
+  else { selInc=t.category; }
+  // Open modal (it will reset things, so we re-apply after)
+  openAddModal();
+  // Re-apply edit state after openAddModal resets it
+  editId = t.id;
+  curType = t.type;
+  amtStr = String(t.amount);
+  document.getElementById('modal-title').textContent = '編輯記錄';
+  document.getElementById('amount-display').textContent = amtStr;
   document.querySelectorAll('.ttb').forEach(b=>b.classList.remove('active'));
   document.querySelector('.ttb.'+t.type)?.classList.add('active');
-  document.getElementById('expense-form').style.display=t.type==='expense'?'':'none';
-  document.getElementById('income-form').style.display=t.type==='income'?'':'none';
-  if(t.type==='expense'){selNec=necOf(t.category);selCat=t.category;updNecBtns();renderSubcats();document.getElementById('tx-name').value=t.name;document.getElementById('tx-date').value=t.date;}
-  else{selInc=t.category;renderIncCats();document.getElementById('inc-name').value=t.name;document.getElementById('inc-date').value=t.date;}
-  // Add delete button at bottom of modal
+  document.getElementById('expense-form').style.display = t.type==='expense'?'':'none';
+  document.getElementById('income-form').style.display = t.type==='income'?'':'none';
+  if(t.type==='expense'){
+    selNec=necOf(t.category); selCat=t.category;
+    updNecBtns(); renderSubcats();
+    document.getElementById('tx-name').value = t.name;
+    document.getElementById('tx-date').value = t.date;
+  } else {
+    selInc=t.category; renderIncCats();
+    document.getElementById('inc-name').value = t.name;
+    document.getElementById('inc-date').value = t.date;
+  }
+  updAmt();
+  // Add delete button
   const existing = document.getElementById('modal-delete-btn');
   if(existing) existing.remove();
   const delBtn = document.createElement('button');
@@ -1418,7 +1433,7 @@ function editTx(){
 }
 
 function deleteTxById(id){
-  data.transactions=data.transactions.filter(t=>t.id!==id);
+  data.transactions=data.transactions.filter(t=>String(t.id)!==String(id));
   saveLocal();pushDeleteTx(id);toast('已刪除記錄');render(curPage);
 }
 function deleteTx(){const id=detailId;data.transactions=data.transactions.filter(t=>t.id!==id);saveLocal();pushDeleteTx(id);closeDM();toast('已刪除記錄');render(curPage);}
