@@ -415,13 +415,14 @@ function setSyncURL(url){
 }
 
 async function apiCall(params){
-  if(!syncURL) throw new Error('NO_URL');
   const isReadOnly = (params.action==='getTx'||params.action==='getGoals');
-  let url = syncURL + '?action=' + encodeURIComponent(params.action);
+  // Route through Netlify proxy (/api/sheets) to avoid CORS
+  const base = '/api/sheets';
+  let url = base + '?action=' + encodeURIComponent(params.action);
   if(!isReadOnly){
     url += '&payload=' + encodeURIComponent(JSON.stringify(params));
   }
-  syncLog('→ ' + params.action + ' ' + url.substring(0,80)+'…');
+  syncLog('→ ' + params.action);
   let res;
   try { res = await fetch(url); }
   catch(e){ throw new Error('網絡錯誤：' + e.message); }
@@ -465,7 +466,7 @@ async function pullFromSheets(){
 
 // Push a single new tx to Sheets
 async function pushAddTx(tx){
-  if(!syncURL) return;
+
   showSyncDot();
   try { await apiCall({action:'addTx', tx}); }
   catch(e){ toast('同步失敗：'+e.message); console.error('pushAddTx',e); }
@@ -473,7 +474,7 @@ async function pushAddTx(tx){
 }
 
 async function pushUpdateTx(tx){
-  if(!syncURL) return;
+
   showSyncDot();
   try { await apiCall({action:'updateTx', tx}); }
   catch(e){ toast('更新失敗：'+e.message); console.error('pushUpdateTx',e); }
@@ -481,7 +482,7 @@ async function pushUpdateTx(tx){
 }
 
 async function pushDeleteTx(id){
-  if(!syncURL) return;
+
   showSyncDot();
   try { await apiCall({action:'deleteTx', id}); }
   catch(e){ toast('刪除失敗：'+e.message); console.error('pushDeleteTx',e); }
@@ -489,7 +490,7 @@ async function pushDeleteTx(id){
 }
 
 async function pushGoals(){
-  if(!syncURL) return;
+
   try { await apiCall({action:'saveGoals', goals}); }
   catch(e){ /* silent */ }
 }
@@ -1195,9 +1196,7 @@ function handleURL(){const p=new URLSearchParams(window.location.search);if(p.ha
 
 // ===== INIT =====
 updateLabels();
-if(syncURL){
-  pullFromSheets().then(()=>{ render(curPage); });
-}
+pullFromSheets().then(()=>{ render(curPage); });
 renderTxPage();
 handleURL();
 </script>
