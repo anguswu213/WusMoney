@@ -384,6 +384,7 @@ const EXP = {
     {id:'transport',label:'交通',    icon:'🚗',color:'#2563EB'},
     {id:'pet',      label:'Cado 🐾', icon:'🐾',color:'#EC4899'},
     {id:'growth',   label:'自我增值', icon:'📚',color:'#7C3AED'},
+    {id:'saving',   label:'儲蓄',    icon:'🏦',color:'#0F766E'},
   ]},
   unnecessary:{label:'非必要開支',color:'#D97706',subs:[
     {id:'dining',        label:'出街食飯', icon:'🍽️',color:'#E8540A'},
@@ -446,12 +447,15 @@ function syncLog(msg){
 async function pullFromSheets(){
   showSyncBar('正在載入…');
   try {
-    const [txs, goals_] = await Promise.all([
+    const [txs, goals_, recurs_] = await Promise.all([
       apiCall({action:'getTx'}),
-      apiCall({action:'getGoals'})
+      apiCall({action:'getGoals'}),
+      apiCall({action:'getRecur'}).catch(()=>[])
     ]);
     data.transactions = txs;
     goals = goals_;
+    if(Array.isArray(recurs_) && recurs_.length) recurs = recurs_;
+    recurSave(recurs);
     saveLocal();
     hideSyncBar();
     return true;
@@ -535,7 +539,8 @@ function goalsLoad(){try{const d=localStorage.getItem('goals_v1');return d?JSON.
 function goalsSave(g){try{localStorage.setItem('goals_v1',JSON.stringify(g));pushGoals();}catch{}}
 // Recurring expenses
 function recurLoad(){try{const d=localStorage.getItem('recur_v1');return d?JSON.parse(d):[];}catch{return[];}}
-function recurSave(r){try{localStorage.setItem('recur_v1',JSON.stringify(r));}catch{}}
+function recurSave(r){try{localStorage.setItem('recur_v1',JSON.stringify(r));pushRecurs();}catch{}}
+async function pushRecurs(){try{await apiCall({action:'saveRecur',recurs});}catch{/* silent */}}
 let recurs=recurLoad();
 let data=loadLocal();
 
@@ -635,7 +640,7 @@ function renderTxPage(){updateLabels();updateSummaryBar();const el=document.getE
 function txItem(t){
   const cat=t.type==='income'?getInc(t.category):getSub(t.category);
   const sign=t.type==='income'?'+':'-';
-  return`<div class="ti" onclick="openDetail(${t.id})"><div class="tic" style="background:${cat.color}22">${cat.icon}</div><div class="tii"><div class="tn">${t.name||cat.label}</div><div class="tm">${cat.label}</div></div><div class="ta ${t.type}">${sign}$${fmt(t.amount)}</div></div>`;
+  return`<div class="ti" onclick="directEdit(${t.id})"><div class="tic" style="background:${cat.color}22">${cat.icon}</div><div class="tii"><div class="tn">${t.name||cat.label}</div><div class="tm">${cat.label}</div></div><div class="ta ${t.type}">${sign}$${fmt(t.amount)}</div></div>`;
 }
 
 function dailyView(){
@@ -1314,7 +1319,11 @@ function openAddModal(pre){
   document.getElementById('add-modal').classList.add('open');
   if(pre){if(pre.amount){amtStr=String(pre.amount);updAmt();}if(pre.name)document.getElementById('tx-name').value=pre.name;}
 }
-function closeAddModal(){document.getElementById('add-modal').classList.remove('open');}
+function closeAddModal(){
+  document.getElementById('add-modal').classList.remove('open');
+  const d=document.getElementById('modal-delete-btn');if(d)d.remove();
+  editId=null;
+}
 
 function setType(tp,btn){
   curType=tp;document.querySelectorAll('.ttb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
@@ -1379,8 +1388,15 @@ function openDetail(id){
   document.getElementById('detail-modal').classList.add('open');
 }
 function closeDM(){document.getElementById('detail-modal').classList.remove('open');}
+
+function directEdit(id){
+  // Tap on transaction → straight to edit modal, no intermediate detail sheet
+  detailId=id;
+  editTx();
+}
+
 function editTx(){
-  const t=data.transactions.find(t=>t.id===detailId);if(!t)return;
+  const t=data.transactions.find(t=>t.id===(detailId||editId));if(!t)return;
   closeDM();editId=t.id;openAddModal();
   document.getElementById('modal-title').textContent='編輯記錄';
   amtStr=String(t.amount);updAmt();curType=t.type;
@@ -1390,6 +1406,20 @@ function editTx(){
   document.getElementById('income-form').style.display=t.type==='income'?'':'none';
   if(t.type==='expense'){selNec=necOf(t.category);selCat=t.category;updNecBtns();renderSubcats();document.getElementById('tx-name').value=t.name;document.getElementById('tx-date').value=t.date;}
   else{selInc=t.category;renderIncCats();document.getElementById('inc-name').value=t.name;document.getElementById('inc-date').value=t.date;}
+  // Add delete button at bottom of modal
+  const existing = document.getElementById('modal-delete-btn');
+  if(existing) existing.remove();
+  const delBtn = document.createElement('button');
+  delBtn.id='modal-delete-btn';
+  delBtn.textContent='刪除此記錄';
+  delBtn.style.cssText='width:calc(100% - 40px);margin:0 20px 16px;padding:14px;background:#FEE2E2;color:var(--expense);border:none;border-radius:var(--radius);font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;';
+  delBtn.onclick=()=>{ deleteTxById(t.id); closeAddModal(); };
+  document.querySelector('.msh').appendChild(delBtn);
+}
+
+function deleteTxById(id){
+  data.transactions=data.transactions.filter(t=>t.id!==id);
+  saveLocal();pushDeleteTx(id);toast('已刪除記錄');render(curPage);
 }
 function deleteTx(){const id=detailId;data.transactions=data.transactions.filter(t=>t.id!==id);saveLocal();pushDeleteTx(id);closeDM();toast('已刪除記錄');render(curPage);}
 
