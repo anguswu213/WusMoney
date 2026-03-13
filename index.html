@@ -163,8 +163,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
 .ff{padding:0 20px;}
 .ffi{margin-bottom:14px;}
 .ffl{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
-.fi{width:100%;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .15s;}
+.fi{width:100%;max-width:100%;box-sizing:border-box;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:15px;color:var(--text);font-family:var(--font);outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none;}
 .fi:focus{border-color:var(--accent);}
+input[type="date"].fi,input[type="month"].fi{padding-right:10px;}
 
 /* NECESSITY TOGGLE */
 .nt{display:flex;gap:8px;margin-bottom:14px;}
@@ -242,8 +243,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
         <button class="mb" onclick="changeMonth(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
       <div class="sb">
-        <div class="si"><span class="sl">收入</span><span class="sv inc" id="hdr-income">$0</span></div>
-        <div class="si"><span class="sl">支出</span><span class="sv exp" id="hdr-expense">$0</span></div>
+        <div class="si" onclick="showPage('stats');switchStatsTab('income')" style="cursor:pointer"><span class="sl">收入</span><span class="sv inc" id="hdr-income">$0</span></div>
+        <div class="si" onclick="showPage('stats');switchStatsTab('expense')" style="cursor:pointer"><span class="sl">支出</span><span class="sv exp" id="hdr-expense">$0</span></div>
         <div class="si"><span class="sl">結餘</span><span class="sv" id="hdr-surplus">$0</span></div>
       </div>
       <div class="vt">
@@ -264,6 +265,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:15
         <button class="mb" onclick="changeMonth(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span class="ml" id="stats-month-label"></span>
         <button class="mb" onclick="changeMonth(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div style="display:flex;margin:10px 20px 0;background:var(--bg2);border-radius:10px;padding:3px;gap:2px;">
+        <button id="stats-tab-inc" onclick="switchStatsTab('income')" style="flex:1;padding:7px;text-align:center;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text3);font-family:var(--font)">收入</button>
+        <button id="stats-tab-exp" onclick="switchStatsTab('expense')" style="flex:1;padding:7px;text-align:center;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:var(--expense);color:white;font-family:var(--font)">支出</button>
       </div>
     </div>
     <div class="scroll" id="stats-content"></div>
@@ -707,8 +712,26 @@ function dayModal(y,mo,d){
 }
 
 // ===== STATS =====
+let curStatsTab = 'expense';
+function switchStatsTab(tab){
+  curStatsTab = tab;
+  const expBtn = document.getElementById('stats-tab-exp');
+  const incBtn = document.getElementById('stats-tab-inc');
+  if(expBtn && incBtn){
+    expBtn.style.background = tab==='expense' ? 'var(--expense)' : 'transparent';
+    expBtn.style.color      = tab==='expense' ? 'white' : 'var(--text3)';
+    incBtn.style.background = tab==='income'  ? 'var(--income)'  : 'transparent';
+    incBtn.style.color      = tab==='income'  ? 'white' : 'var(--text3)';
+  }
+  if(tab==='income') renderIncomeStats(); else renderExpenseStats();
+}
+
 function renderStats(){
   updateLabels();
+  switchStatsTab(curStatsTab);
+}
+
+function renderExpenseStats(){
   const txs=mTxs(curMonth),exps=txs.filter(t=>t.type==='expense'),totE=exps.reduce((s,t)=>s+t.amount,0);
   Object.values(charts).forEach(c=>{try{c.destroy();}catch{}});charts={};
   const ct={};exps.forEach(t=>{if(!ct[t.category])ct[t.category]=0;ct[t.category]+=t.amount;});
@@ -752,6 +775,54 @@ function renderStats(){
   if(totE&&pd.length){charts.pie=new Chart(document.getElementById('pie-c'),{type:'doughnut',data:{labels:pl,datasets:[{data:pd,backgroundColor:pc,borderWidth:0,hoverOffset:4}]},options:{cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` $${fmt(ctx.raw)}`}}},animation:{duration:500}}});}
   charts.trend=new Chart(document.getElementById('trend-c'),{type:'line',data:{labels:m6.map(x=>x.lb),datasets:[{data:te,borderColor:'#C0392B',backgroundColor:'rgba(192,57,43,.07)',tension:.4,fill:true,pointBackgroundColor:'#C0392B',pointRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4,font:{family:'DM Mono'}}},x:{grid:{display:false}}},animation:{duration:500}}});
   charts.inexp=new Chart(document.getElementById('inexp-c'),{type:'bar',data:{labels:m6.map(x=>x.lb),datasets:[{label:'收入',data:ti,backgroundColor:'rgba(46,125,79,.7)',borderRadius:4},{label:'支出',data:te,backgroundColor:'rgba(192,57,43,.7)',borderRadius:4}]},options:{plugins:{legend:{labels:{boxWidth:12,font:{family:'Noto Sans TC'}}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4}},x:{grid:{display:false}}},animation:{duration:500}}});
+}
+
+function renderIncomeStats(){
+  updateLabels();
+  const txs=mTxs(curMonth), incs=txs.filter(t=>t.type==='income'), totI=incs.reduce((s,t)=>s+t.amount,0);
+  Object.values(charts).forEach(c=>{try{c.destroy();}catch{}});charts={};
+  // Group by category
+  const ct={}; incs.forEach(t=>{if(!ct[t.category])ct[t.category]=0;ct[t.category]+=t.amount;});
+  const ce=Object.entries(ct).sort((a,b)=>b[1]-a[1]);
+  const pl=[],pd=[],pc=[]; ce.forEach(([id,v])=>{const c=getInc(id);pl.push(c.label);pd.push(v);pc.push(c.color);});
+  // 6 months income trend
+  const m6=[]; for(let i=5;i>=0;i--){const d=new Date(curMonth.getFullYear(),curMonth.getMonth()-i,1);m6.push({y:d.getFullYear(),m:d.getMonth()+1,lb:`${d.getMonth()+1}月`});}
+  const ti=m6.map(({y,m})=>data.transactions.filter(t=>{const[ty,tm]=t.date.split('-').map(Number);return ty===y&&tm===m&&t.type==='income';}).reduce((s,t)=>s+t.amount,0));
+  const te=m6.map(({y,m})=>data.transactions.filter(t=>{const[ty,tm]=t.date.split('-').map(Number);return ty===y&&tm===m&&t.type==='expense';}).reduce((s,t)=>s+t.amount,0));
+  // Category rows
+  const rows=ce.map(([id,v])=>{
+    const cat=getInc(id), pct=totI?((v/totI)*100).toFixed(1):'0';
+    return`<div class="cr"><div class="cdot2" style="background:${cat.color}"></div><div class="cri"><div class="crn">${cat.icon} ${cat.label}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><div class="cv">$${fmt(v)}</div><div class="cp">${pct}%</div></div></div>`;
+  }).join('');
+
+  // Transaction list grouped by date
+  const byD={}; incs.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(t=>{if(!byD[t.date])byD[t.date]=[];byD[t.date].push(t);});
+  const txHtml=Object.keys(byD).sort((a,b)=>b.localeCompare(a)).map(date=>{
+    const d2=parseInt(date.split('-')[2]),dn=['日','一','二','三','四','五','六'][new Date(date).getDay()],di=byD[date].reduce((s,t)=>s+t.amount,0);
+    return`<div class="dg"><div class="dh"><span class="dd">${d2}日 (${dn})</span><span class="ds" style="color:var(--income)">+$${fmt(di)}</span></div>${byD[date].map(txItem).join('')}</div>`;
+  }).join('')||'<div style="text-align:center;color:var(--text3);padding:24px 0">本月暫無收入記錄</div>';
+
+  document.getElementById('stats-content').innerHTML=`
+    <div class="ss">
+      <div class="sst">本月收入分佈</div>
+      ${totI?`<div class="pw"><canvas id="inc-pie-c"></canvas><div class="pc"><div class="pt" style="color:var(--income)">$${fmt(totI)}</div><div class="pl">總收入</div></div></div>`:''}
+      <div class="cl">${rows||'<div style="text-align:center;color:var(--text3);padding:24px 0">本月暫無收入</div>'}</div>
+    </div>
+    <div class="ss" style="border-top:1px solid var(--border)">
+      <div class="sst">近6個月收入趨勢</div><div class="cw"><canvas id="inc-trend-c"></canvas></div>
+    </div>
+    <div class="ss" style="border-top:1px solid var(--border)">
+      <div class="sst">收支對比</div><div class="cw"><canvas id="inc-inexp-c"></canvas></div>
+    </div>
+    <div class="ss" style="border-top:1px solid var(--border)">
+      <div class="sst">本月收入記錄</div>
+      ${txHtml}
+    </div>
+    <div style="height:16px"></div>`;
+
+  if(totI&&pd.length){charts.incPie=new Chart(document.getElementById('inc-pie-c'),{type:'doughnut',data:{labels:pl,datasets:[{data:pd,backgroundColor:pc,borderWidth:0,hoverOffset:4}]},options:{cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` $${fmt(ctx.raw)}`}}},animation:{duration:500}}});}
+  charts.incTrend=new Chart(document.getElementById('inc-trend-c'),{type:'line',data:{labels:m6.map(x=>x.lb),datasets:[{data:ti,borderColor:'#2E7D4F',backgroundColor:'rgba(46,125,79,.07)',tension:.4,fill:true,pointBackgroundColor:'#2E7D4F',pointRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4,font:{family:'DM Mono'}}},x:{grid:{display:false}}},animation:{duration:500}}});
+  charts.incInexp=new Chart(document.getElementById('inc-inexp-c'),{type:'bar',data:{labels:m6.map(x=>x.lb),datasets:[{label:'收入',data:ti,backgroundColor:'rgba(46,125,79,.7)',borderRadius:4},{label:'支出',data:te,backgroundColor:'rgba(192,57,43,.7)',borderRadius:4}]},options:{plugins:{legend:{labels:{boxWidth:12,font:{family:'Noto Sans TC'}}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.08)'},ticks:{callback:v=>'$'+fmt(v),maxTicksLimit:4}},x:{grid:{display:false}}},animation:{duration:500}}});
 }
 
 // ===== CDP STATE (shared month for all detail views) =====
