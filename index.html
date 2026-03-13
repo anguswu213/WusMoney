@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="家計簿">
-<title>家計簿</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wu's Money">
+<title>Wu's Money</title>
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#1A1916">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -185,7 +187,7 @@ input[type="date"].fi,input[type="month"].fi{padding-right:10px;}
 .sbl{font-size:10px;color:var(--text2);text-align:center;line-height:1.2;}
 
 /* NUMPAD */
-.np{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);margin-top:16px;}
+.np{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border);margin-top:16px;}
 .nb2{background:var(--card);border:none;padding:18px;font-size:20px;font-family:var(--mono);font-weight:500;color:var(--text);cursor:pointer;transition:background .1s;display:flex;align-items:center;justify-content:center;}
 .nb2:active{background:var(--bg3);}
 .nb2.ac2{font-size:15px;font-family:var(--font);font-weight:600;color:var(--text2);}
@@ -346,10 +348,10 @@ input[type="date"].fi,input[type="month"].fi{padding-right:10px;}
     </div>
 
     <div class="np">
-      <button class="nb2" onclick="ni2('7')">7</button><button class="nb2" onclick="ni2('8')">8</button><button class="nb2" onclick="ni2('9')">9</button>
-      <button class="nb2" onclick="ni2('4')">4</button><button class="nb2" onclick="ni2('5')">5</button><button class="nb2" onclick="ni2('6')">6</button>
-      <button class="nb2" onclick="ni2('1')">1</button><button class="nb2" onclick="ni2('2')">2</button><button class="nb2" onclick="ni2('3')">3</button>
-      <button class="nb2 ac2" onclick="ni2('.')">.</button><button class="nb2" onclick="ni2('0')">0</button><button class="nb2 ac2" onclick="nd()">⌫</button>
+      <button class="nb2" onclick="ni2('7')">7</button><button class="nb2" onclick="ni2('8')">8</button><button class="nb2" onclick="ni2('9')">9</button><button class="nb2 ac2" onclick="ni2('+')">＋</button>
+      <button class="nb2" onclick="ni2('4')">4</button><button class="nb2" onclick="ni2('5')">5</button><button class="nb2" onclick="ni2('6')">6</button><button class="nb2 ac2" onclick="ni2('-')">－</button>
+      <button class="nb2" onclick="ni2('1')">1</button><button class="nb2" onclick="ni2('2')">2</button><button class="nb2" onclick="ni2('3')">3</button><button class="nb2 ac2" onclick="ni2('×')">×</button>
+      <button class="nb2 ac2" onclick="ni2('.')">.</button><button class="nb2" onclick="ni2('0')">0</button><button class="nb2 ac2" onclick="nd()">⌫</button><button class="nb2 ac2" onclick="calcEquals()" style="background:var(--accent);color:white;font-size:18px">=</button>
     </div>
     <button class="sbtn" onclick="submitTx()">儲存</button>
   </div>
@@ -623,6 +625,18 @@ function mSum(txs){
   let inc=0,exp=0;txs.forEach(t=>{if(t.type==='income')inc+=t.amount;else if(t.type==='expense')exp+=t.amount;});
   return{inc,exp,sur:inc-exp};
 }
+const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_COLORS=['#E53E3E','#805AD5','#3182CE','#2F855A','#C05621','#B7791F','#E53E3E'];
+function localDay(dateStr){
+  // Parse YYYY-MM-DD without UTC shift
+  const [y,m,d]=dateStr.split('-').map(Number);
+  return new Date(y,m-1,d).getDay();
+}
+function dayChip(dateStr){
+  const dow=localDay(dateStr);
+  const col=DAY_COLORS[dow];
+  return `<span style="display:inline-block;background:${col};color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;font-family:var(--mono);letter-spacing:.3px">${DAY_NAMES[dow]}</span>`;
+}
 function fmt(n){
   if(!n)return'0';
   return n>=1000?n.toLocaleString('en-CA',{maximumFractionDigits:0}):n.toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -653,9 +667,9 @@ function dailyView(){
   const byD={};txs.forEach(t=>{if(!byD[t.date])byD[t.date]=[];byD[t.date].push(t);});
   return Object.keys(byD).sort((a,b)=>b.localeCompare(a)).map(date=>{
     const dt=byD[date],inc=dt.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),exp=dt.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-    const d=parseInt(date.split('-')[2]),dn=['日','一','二','三','四','五','六'][new Date(date).getDay()];
+    const d=parseInt(date.split('-')[2]);
     const pts=[inc?`+$${fmt(inc)}`:'',exp?`-$${fmt(exp)}`:''].filter(Boolean).join(' ');
-    return`<div class="dg"><div class="dh"><span class="dd">${d}日 (${dn})</span><span class="ds">${pts}</span></div>${dt.map(txItem).join('')}</div>`;
+    return`<div class="dg"><div class="dh"><span class="dd">${d} ${dayChip(date)}</span><span class="ds">${pts}</span></div>${dt.map(txItem).join('')}</div>`;
   }).join('');
 }
 
@@ -798,8 +812,8 @@ function renderIncomeStats(){
   // Transaction list grouped by date
   const byD={}; incs.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(t=>{if(!byD[t.date])byD[t.date]=[];byD[t.date].push(t);});
   const txHtml=Object.keys(byD).sort((a,b)=>b.localeCompare(a)).map(date=>{
-    const d2=parseInt(date.split('-')[2]),dn=['日','一','二','三','四','五','六'][new Date(date).getDay()],di=byD[date].reduce((s,t)=>s+t.amount,0);
-    return`<div class="dg"><div class="dh"><span class="dd">${d2}日 (${dn})</span><span class="ds" style="color:var(--income)">+$${fmt(di)}</span></div>${byD[date].map(txItem).join('')}</div>`;
+    const d2=parseInt(date.split('-')[2]),di=byD[date].reduce((s,t)=>s+t.amount,0);
+    return`<div class="dg"><div class="dh"><span class="dd">${d2} ${dayChip(date)}</span><span class="ds" style="color:var(--income)">+$${fmt(di)}</span></div>${byD[date].map(txItem).join('')}</div>`;
   }).join('')||'<div style="text-align:center;color:var(--text3);padding:24px 0">本月暫無收入記錄</div>';
 
   document.getElementById('stats-content').innerHTML=`
@@ -866,8 +880,8 @@ function renderCDP(catId){
   const mTx = data.transactions.filter(t=>{const[ty,tm]=t.date.split('-').map(Number);return ty===y&&tm===m&&t.category===catId;}).sort((a,b)=>b.date.localeCompare(a.date));
   const byD = {}; mTx.forEach(t=>{if(!byD[t.date])byD[t.date]=[];byD[t.date].push(t);});
   const txHtml = Object.keys(byD).sort((a,b)=>b.localeCompare(a)).map(date=>{
-    const d2=parseInt(date.split('-')[2]),dn=['日','一','二','三','四','五','六'][new Date(date).getDay()],de=byD[date].reduce((s,t)=>s+t.amount,0);
-    return '<div class="dg"><div class="dh"><span class="dd">'+d2+'日 ('+dn+')</span><span class="ds">-$'+fmt(de)+'</span></div>'+byD[date].map(txItem).join('')+'</div>';
+    const d2=parseInt(date.split('-')[2]),de=byD[date].reduce((s,t)=>s+t.amount,0);
+    return '<div class="dg"><div class="dh"><span class="dd">'+d2+' </span>'+dayChip(date)+'<span class="ds">-$'+fmt(de)+'</span></div>'+byD[date].map(txItem).join('')+'</div>';
   }).join('') || '<div class="es" style="padding:24px"><div style="font-size:32px;opacity:.4">📭</div><div style="font-size:13px;color:var(--text3);margin-top:8px">該月暫無記錄</div></div>';
 
   document.getElementById('cdp-content').innerHTML =
@@ -935,8 +949,8 @@ function renderNecDP(necType){
 
   const byD = {}; mTx.forEach(t=>{if(!byD[t.date])byD[t.date]=[];byD[t.date].push(t);});
   const txHtml = Object.keys(byD).sort((a,b)=>b.localeCompare(a)).map(date=>{
-    const d2=parseInt(date.split('-')[2]),dn=['日','一','二','三','四','五','六'][new Date(date).getDay()],de=byD[date].reduce((s,t)=>s+t.amount,0);
-    return '<div class="dg"><div class="dh"><span class="dd">'+d2+'日 ('+dn+')</span><span class="ds">-$'+fmt(de)+'</span></div>'+byD[date].map(txItem).join('')+'</div>';
+    const d2b=parseInt(date.split('-')[2]),deb=byD[date].reduce((s,t)=>s+t.amount,0);
+    return '<div class="dg"><div class="dh"><span class="dd">'+d2b+' </span>'+dayChip(date)+'<span class="ds">-$'+fmt(deb)+'</span></div>'+byD[date].map(txItem).join('')+'</div>';
   }).join('') || '<div class="es" style="padding:24px"><div style="font-size:32px;opacity:.4">📭</div><div style="font-size:13px;color:var(--text3);margin-top:8px">該月暫無記錄</div></div>';
 
   document.getElementById('cdp-content').innerHTML =
@@ -1375,7 +1389,7 @@ function shortcutGuide(type){
 
 // ===== ADD MODAL =====
 function openAddModal(pre){
-  editId=null;amtStr='';selCat=null;selInc=null;curType='expense';selNec='necessary';
+  editId=null;amtStr='';calcExpr='';selCat=null;selInc=null;curType='expense';selNec='necessary';
   document.getElementById('modal-title').textContent='新增記錄';
   document.getElementById('amount-display').textContent='0';
   document.getElementById('amount-display').className='av';
@@ -1393,7 +1407,7 @@ function openAddModal(pre){
 function closeAddModal(){
   document.getElementById('add-modal').classList.remove('open');
   const d=document.getElementById('modal-delete-btn');if(d)d.remove();
-  editId=null;
+  editId=null;calcExpr='';
 }
 
 function setType(tp,btn){
@@ -1419,16 +1433,92 @@ function renderIncCats(){
 }
 function pickInc(id){selInc=id;renderIncCats();}
 
+// Calculator state: expression string like "12.5+3×4"
+let calcExpr = ''; // full expression shown in display
+const OPS = ['+','-','×','÷'];
+function isOp(c){ return OPS.includes(c); }
+
 function ni2(v){
-  if(v==='.'&&amtStr.includes('.'))return;
-  if(amtStr==='0'&&v!=='.')amtStr=v;else if(amtStr.length<10)amtStr+=v;
+  if(isOp(v)){
+    // Replace trailing operator if last char is already an op
+    if(calcExpr===''&&v==='-'){ calcExpr='-'; updAmt(); return; }
+    if(calcExpr===''){ return; }
+    if(isOp(calcExpr.slice(-1))){ calcExpr=calcExpr.slice(0,-1)+v; }
+    else { calcExpr+=v; }
+    // Sync amtStr to current evaluated value so colour shows
+    const cur=evalExpr(calcExpr.slice(0,-1));
+    if(cur!==null) amtStr=String(cur);
+    updAmt(); return;
+  }
+  if(v==='.'){ 
+    // Only add dot if last number segment doesn't have one
+    const seg=calcExpr.split(/[+\-×÷]/).pop();
+    if(seg.includes('.')) return;
+  }
+  if(calcExpr==='0') calcExpr=v;
+  else if(calcExpr.length<20) calcExpr+=v;
+  // Keep amtStr as last number segment for colour
+  const seg=calcExpr.split(/[+\-×÷]/).pop();
+  amtStr=seg||'0';
   updAmt();
 }
-function nd(){amtStr=amtStr.slice(0,-1);updAmt();}
-function updAmt(){const el=document.getElementById('amount-display');el.textContent=amtStr||'0';el.className='av'+(amtStr?' hv '+curType:'');}
+
+function nd(){
+  if(calcExpr.length>0) calcExpr=calcExpr.slice(0,-1);
+  if(calcExpr===''||calcExpr==='-') calcExpr='';
+  const seg=calcExpr.split(/[+\-×÷]/).pop();
+  amtStr=seg||'';
+  updAmt();
+}
+
+function evalExpr(expr){
+  if(!expr) return null;
+  try{
+    // Replace × ÷ with * /
+    const safe=expr.replace(/×/g,'*').replace(/÷/g,'/');
+    // Only allow numbers, operators, dots
+    if(!/^-?[\d.]+([+\-*/][\d.]+)*$/.test(safe)) return null;
+    // eslint-disable-next-line no-new-func
+    const result=Function('"use strict";return('+safe+')')();
+    if(!isFinite(result)) return null;
+    return Math.round(result*100)/100;
+  }catch{ return null; }
+}
+
+function calcEquals(){
+  // = button: evaluate full expression
+  if(!calcExpr) return;
+  // Remove trailing operator
+  let expr=calcExpr;
+  if(isOp(expr.slice(-1))) expr=expr.slice(0,-1);
+  const result=evalExpr(expr);
+  if(result!==null&&result>0){
+    calcExpr=String(result);
+    amtStr=calcExpr;
+    updAmt();
+  } else {
+    toast('計算錯誤');
+  }
+}
+
+function updAmt(){
+  const el=document.getElementById('amount-display');
+  // Show full expression; if has operator, show expression else show number
+  el.textContent=calcExpr||'0';
+  el.className='av'+(amtStr&&parseFloat(amtStr)>0?' hv '+curType:'');
+  // Shrink font if expression is long
+  el.style.fontSize=calcExpr.length>10?'28px':calcExpr.length>7?'36px':'44px';
+}
+
+// Patch openAddModal to reset calcExpr too
+
 
 function submitTx(){
-  const amt=parseFloat(amtStr);if(!amt||amt<=0){toast('請輸入金額');return;}
+  // Evaluate any pending expression
+  let expr=calcExpr; if(isOp(expr.slice(-1))) expr=expr.slice(0,-1);
+  const evaluated=evalExpr(expr);
+  const amt=evaluated!==null?evaluated:parseFloat(amtStr);
+  if(!amt||amt<=0){toast('請輸入金額');return;}
   const isInc=curType==='income';
   if(!isInc&&!selCat){toast('請選擇類別');return;}
   if(isInc&&!selInc){toast('請選擇收入類別');return;}
@@ -1475,6 +1565,7 @@ function directEdit(id){
   editId = t.id;
   curType = t.type;
   amtStr = String(t.amount);
+  calcExpr = String(t.amount);
   document.getElementById('modal-title').textContent = '編輯記錄';
   document.getElementById('amount-display').textContent = amtStr;
   document.querySelectorAll('.ttb').forEach(b=>b.classList.remove('active'));
