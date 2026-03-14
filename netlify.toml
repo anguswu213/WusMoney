@@ -1,7 +1,2 @@
-[[redirects]]
-  from = "/api/sheets"
-  to = "https://script.google.com/macros/s/AKfycbxL6zjGrdnZP59eF7BNiEndRAxErhjU73oaZUO1ILS5e-8pqn-GkeMv6oZ9C7ZO8CeM/exec"
-  status = 200
-  force = true
-  [redirects.headers]
-    Access-Control-Allow-Origin = "*"
+# No proxy needed — app calls Google Apps Script directly
+# This avoids Netlify bandwidth/function usage entirely
