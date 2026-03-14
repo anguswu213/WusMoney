@@ -626,16 +626,13 @@ function mSum(txs){
   return{inc,exp,sur:inc-exp};
 }
 const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const DAY_COLORS=['#E53E3E','#805AD5','#3182CE','#2F855A','#C05621','#B7791F','#E53E3E'];
 function localDay(dateStr){
-  // Parse YYYY-MM-DD without UTC shift
   const [y,m,d]=dateStr.split('-').map(Number);
   return new Date(y,m-1,d).getDay();
 }
 function dayChip(dateStr){
   const dow=localDay(dateStr);
-  const col=DAY_COLORS[dow];
-  return `<span style="display:inline-block;background:${col};color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;font-family:var(--mono);letter-spacing:.3px">${DAY_NAMES[dow]}</span>`;
+  return `<span style="display:inline-block;background:var(--text3);color:var(--card);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;font-family:var(--mono);letter-spacing:.3px">${DAY_NAMES[dow]}</span>`;
 }
 function fmt(n){
   if(!n)return'0';
@@ -762,6 +759,13 @@ function renderExpenseStats(){
     return`<div class="cr" onclick="openCDP('${id}')"><div class="cdot2" style="background:${cat.color}"></div><div class="cri"><div class="crn">${cat.icon} ${cat.label}</div><div class="crs">${n==='necessary'?'必要':'非必要'}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px"><div class="cv">$${fmt(v)}</div><div class="cp">${pct}%</div></div><div style="color:var(--text3);margin-left:4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div></div>`;
   }).join('');
 
+  // Build transaction list grouped by date
+  const byD2={}; exps.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(t=>{if(!byD2[t.date])byD2[t.date]=[];byD2[t.date].push(t);});
+  const txHtml2=Object.keys(byD2).sort((a,b)=>b.localeCompare(a)).map(date=>{
+    const d2=parseInt(date.split('-')[2]),de=byD2[date].reduce((s,t)=>s+t.amount,0);
+    return`<div class="dg"><div class="dh"><span class="dd">${d2} ${dayChip(date)}</span><span class="ds">-$${fmt(de)}</span></div>${byD2[date].map(txItem).join('')}</div>`;
+  }).join('')||'<div style="text-align:center;color:var(--text3);padding:24px 0">本月暫無支出記錄</div>';
+
   document.getElementById('stats-content').innerHTML=`
     <div class="ss">
       <div class="sst">本月支出分佈</div>
@@ -783,6 +787,10 @@ function renderExpenseStats(){
     </div>
     <div class="ss" style="border-top:1px solid var(--border)">
       <div class="sst">收支對比</div><div class="cw"><canvas id="inexp-c"></canvas></div>
+    </div>
+    <div class="ss" style="border-top:1px solid var(--border)">
+      <div class="sst">本月支出記錄</div>
+      ${txHtml2}
     </div>
     <div style="height:16px"></div>`;
 
