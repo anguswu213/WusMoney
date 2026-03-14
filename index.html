@@ -423,16 +423,16 @@ function setSyncURL(url){
 async function apiCall(params){
   const url = syncURL;
   if(!url) throw new Error('NO_URL');
-  // Call Apps Script directly — no Netlify proxy needed
   let fullUrl = url + '?action=' + encodeURIComponent(params.action);
-  // Pass all params except action as payload
   const payload = {...params}; delete payload.action;
   if(Object.keys(payload).length){
     fullUrl += '&payload=' + encodeURIComponent(JSON.stringify(payload));
   }
   syncLog('→ ' + params.action);
   let res;
-  try { res = await fetch(fullUrl); }
+  try {
+    res = await fetch(fullUrl, {redirect: 'follow'});
+  }
   catch(e){ throw new Error('網絡錯誤：' + e.message); }
   if(!res.ok) throw new Error('HTTP ' + res.status);
   let json;
