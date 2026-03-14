@@ -1230,7 +1230,7 @@ function renderRecurSection(){
 }
 
 function openRecurModal(){
-  const today = new Date().toISOString().split('T')[0];
+  const _tr=new Date(),today=`${_tr.getFullYear()}-${String(_tr.getMonth()+1).padStart(2,'0')}-${String(_tr.getDate()).padStart(2,'0')}`;
   const ov = document.createElement('div'); ov.className='mo open'; ov.style.zIndex='400';
   const allCats = [...EXP.necessary.subs, ...EXP.unnecessary.subs];
   const catOpts = allCats.map(c=>`<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
@@ -1404,7 +1404,7 @@ function openAddModal(pre){
   document.getElementById('amount-display').textContent='0';
   document.getElementById('amount-display').className='av';
   ['tx-name','inc-name'].forEach(id=>document.getElementById(id).value='');
-  const td=new Date().toISOString().split('T')[0];
+  const _t=new Date(),td=`${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`;
   document.getElementById('tx-date').value=td;document.getElementById('inc-date').value=td;
   document.querySelectorAll('.ttb').forEach(b=>b.classList.remove('active'));
   document.querySelector('.ttb.expense').classList.add('active');
