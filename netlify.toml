@@ -1,2 +1,1 @@
-# No proxy needed — app calls Google Apps Script directly
-# This avoids Netlify bandwidth/function usage entirely
+
