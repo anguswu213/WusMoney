@@ -1185,7 +1185,6 @@ function deleteGoal(gi){
 // lastGenerated: YYYY-MM (last month we generated for)
 
 function recurGenerate(){
-  // Generate any missing transactions from recurring rules up to today
   const today = new Date();
   today.setHours(0,0,0,0);
   let added = 0;
@@ -1193,11 +1192,18 @@ function recurGenerate(){
     if(!r.active) return;
     const dates = recurDates(r, today);
     dates.forEach(dateStr=>{
-      // Check if transaction for this exact recur+date already exists
-      const exists = data.transactions.some(t=>t.recurId===r.id && t.date===dateStr);
+      // String() cast fixes string/number mismatch from Sheets returning recurId as string
+      const exists = data.transactions.some(t=>
+        (t.recurId != null && t.recurId !== '' && String(t.recurId)===String(r.id) && t.date===dateStr) ||
+        (!t.recurId && t.name===r.name && t.date===dateStr && Number(t.amount)===Number(r.amount))
+      );
       if(!exists){
-        const tx = {id: Date.now()+Math.random(), type:'expense', amount:r.amount,
-          name:r.name, category:r.category, date:dateStr, note:'🔁 定期', recurId:r.id};
+        const tx = {
+          id: Date.now()+Math.floor(Math.random()*10000),
+          type:'expense', amount:r.amount,
+          name:r.name, category:r.category,
+          date:dateStr, note:'🔁 定期', recurId:r.id
+        };
         data.transactions.push(tx);
         pushAddTx(tx);
         added++;
@@ -1209,21 +1215,23 @@ function recurGenerate(){
 }
 
 function recurDates(r, upTo){
-  // Return all dates this rule should have fired from startDate up to upTo
   const results = [];
-  const start = new Date(r.startDate+'T00:00:00');
+  // Parse as local time — avoids UTC midnight causing wrong date
+  const [sy,sm,sd] = r.startDate.split('-').map(Number);
+  const start = new Date(sy, sm-1, sd);
   if(start > upTo) return results;
   if(r.freq === 'monthly'){
-    // Same day every month from start month to current month
     let d = new Date(start);
     while(d <= upTo){
-      results.push(d.toISOString().split('T')[0]);
-      d = new Date(d.getFullYear(), d.getMonth()+1, start.getDate());
+      const y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate();
+      results.push(`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`);
+      d = new Date(d.getFullYear(), d.getMonth()+1, sd); // use original sd to avoid drift
     }
   } else if(r.freq === 'biweekly'){
     let d = new Date(start);
     while(d <= upTo){
-      results.push(d.toISOString().split('T')[0]);
+      const y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate();
+      results.push(`${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`);
       d = new Date(d.getTime() + 14*86400000);
     }
   }
