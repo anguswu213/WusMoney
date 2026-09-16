@@ -590,6 +590,24 @@ if(!data.transactions.length){
   saveLocal();
 }
 
+// ===== DEDUPE (fixes duplicate rows sharing the same id) =====
+function dedupeTransactions(){
+  const seen = new Set();
+  let removed = 0;
+  data.transactions = data.transactions.filter(t=>{
+    if(seen.has(t.id)){ removed++; return false; }
+    seen.add(t.id);
+    return true;
+  });
+  if(removed) saveLocal();
+  return removed;
+}
+function manualDedupe(){
+  const n = dedupeTransactions();
+  toast(n ? `已移除 ${n} 筆重複記錄 ✓` : '未發現重複記錄');
+  render(curPage);
+}
+
 // ===== STATE =====
 let curPage='transactions',curView='daily';
 let curMonth=new Date();curMonth.setDate(1);
@@ -1356,6 +1374,7 @@ function renderSettings(){
     <div class="gs">
       <div class="gst">資料</div>
       <div class="sr" onclick="expCSV()"><div class="sri" style="background:#E3F2FD">📤</div><div class="srt"><div class="srl">匯出 CSV</div><div class="srs">下載所有記錄</div></div><div class="sra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div></div>
+      <div class="sr" onclick="manualDedupe()"><div class="sri" style="background:#FFF3E0">🧹</div><div class="srt"><div class="srl">掃描重複記錄</div><div class="srs">移除 id 相同嘅重複記錄</div></div><div class="sra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg></div></div>
     </div>
 
     <div class="gs">
@@ -1552,18 +1571,24 @@ function updAmt(){
 // Patch openAddModal to reset calcExpr too
 
 
+let submitInProgress = false;
+function genId(){ return Date.now()+'-'+Math.random().toString(36).slice(2,8); }
 function submitTx(){
+  // Guard against double-fire (e.g. touch + click both triggering on mobile Safari)
+  if(submitInProgress) return;
+  submitInProgress = true;
+  setTimeout(()=>{ submitInProgress = false; }, 800);
   // Evaluate any pending expression
   let expr=calcExpr; if(isOp(expr.slice(-1))) expr=expr.slice(0,-1);
   const evaluated=evalExpr(expr);
   const amt=evaluated!==null?evaluated:parseFloat(amtStr);
-  if(!amt||amt<=0){toast('請輸入金額');return;}
+  if(!amt||amt<=0){toast('請輸入金額');submitInProgress=false;return;}
   const isInc=curType==='income';
-  if(!isInc&&!selCat){toast('請選擇類別');return;}
-  if(isInc&&!selInc){toast('請選擇收入類別');return;}
+  if(!isInc&&!selCat){toast('請選擇類別');submitInProgress=false;return;}
+  if(isInc&&!selInc){toast('請選擇收入類別');submitInProgress=false;return;}
   const isEdit = !!editId;
   const tx={
-    id:editId||Date.now(),type:curType,amount:amt,
+    id:editId||genId(),type:curType,amount:amt,
     name:isInc?(document.getElementById('inc-name').value||getInc(selInc).label):(document.getElementById('tx-name').value||getSub(selCat).label),
     category:isInc?selInc:selCat,
     date:isInc?document.getElementById('inc-date').value:document.getElementById('tx-date').value,
@@ -1647,7 +1672,12 @@ function handleURL(){const p=new URLSearchParams(window.location.search);if(p.ha
 
 // ===== INIT =====
 updateLabels();
-pullFromSheets().then(()=>{ recurGenerate(); render(curPage); });
+pullFromSheets().then(()=>{
+  const removed = dedupeTransactions();
+  recurGenerate();
+  render(curPage);
+  if(removed) toast(`已自動移除 ${removed} 筆重複記錄`);
+});
 renderTxPage();
 handleURL();
 </script>
