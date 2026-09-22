@@ -697,7 +697,7 @@ function renderTxPage(){updateLabels();updateSummaryBar();const el=document.getE
 function txItem(t){
   const cat=t.type==='income'?getInc(t.category):getSub(t.category);
   const sign=t.type==='income'?'+':'-';
-  return`<div class="ti" onclick="directEdit(${t.id})"><div class="tic" style="background:${cat.color}22">${cat.icon}</div><div class="tii"><div class="tn">${t.name||cat.label}</div><div class="tm">${cat.label}</div></div><div class="ta ${t.type}">${sign}$${fmt(t.amount)}</div></div>`;
+  return`<div class="ti" onclick="directEdit('${t.id}')"><div class="tic" style="background:${cat.color}22">${cat.icon}</div><div class="tii"><div class="tn">${t.name||cat.label}</div><div class="tm">${cat.label}</div></div><div class="ta ${t.type}">${sign}$${fmt(t.amount)}</div></div>`;
 }
 
 function dailyView(){
